@@ -220,34 +220,59 @@ bie-dropdown::part(error) { }        /* Error state message */
 "></bie-dropdown>
 ```
 
-### Tailwind CSS
+### Tailwind CSS (v4)
 
-Style `bie-dropdown` with Tailwind utility classes via CSS custom properties and parts.
+Style `bie-dropdown` with Tailwind v4's CSS-first approach via custom properties and parts.
 
-#### Using custom properties (simplest)
-
-```html
-<bie-dropdown
-  class="[--bie-bg:theme(colors.white)] [--bie-border:theme(colors.gray.300)] 
-         [--bie-text:theme(colors.gray.900)] [--bie-hover-bg:theme(colors.gray.100)]
-         [--bie-focus-ring:theme(colors.blue.500)] [--bie-radius:theme(borderRadius.lg)]"
-></bie-dropdown>
-```
-
-#### Dark theme with Tailwind
+#### Quick inline (arbitrary properties)
 
 ```html
 <bie-dropdown
-  class="[--bie-bg:theme(colors.gray.900)] [--bie-border:theme(colors.gray.700)]
-         [--bie-text:theme(colors.gray.100)] [--bie-hover-bg:theme(colors.gray.800)]
-         [--bie-focus-ring:theme(colors.violet.400)]"
+  class="[--bie-bg:var(--color-white)] [--bie-border:var(--color-gray-300)]
+         [--bie-text:var(--color-gray-900)] [--bie-hover-bg:var(--color-gray-100)]
+         [--bie-focus-ring:var(--color-blue-500)] [--bie-radius:var(--radius-lg)]"
 ></bie-dropdown>
 ```
 
-#### Customizing parts via global CSS
+#### Dark mode with `dark:` variant
+
+```html
+<bie-dropdown
+  class="[--bie-bg:var(--color-white)] [--bie-text:var(--color-gray-900)]
+         dark:[--bie-bg:var(--color-gray-900)] dark:[--bie-text:var(--color-gray-100)]
+         dark:[--bie-border:var(--color-gray-700)] dark:[--bie-hover-bg:var(--color-gray-800)]"
+></bie-dropdown>
+```
+
+#### Register design tokens with `@theme`
 
 ```css
-/* In your Tailwind CSS file */
+/* app.css */
+@import "tailwindcss";
+
+@theme {
+  --color-bie-bg: #ffffff;
+  --color-bie-border: #d1d5db;
+  --color-bie-text: #111827;
+  --color-bie-hover-bg: #f3f4f6;
+  --color-bie-focus-ring: #3b82f6;
+  --radius-bie: 0.5rem;
+}
+```
+
+```html
+<bie-dropdown
+  class="[--bie-bg:var(--color-bie-bg)] [--bie-border:var(--color-bie-border)]
+         [--bie-text:var(--color-bie-text)] [--bie-hover-bg:var(--color-bie-hover-bg)]
+         [--bie-focus-ring:var(--color-bie-focus-ring)] [--bie-radius:var(--radius-bie)]"
+></bie-dropdown>
+```
+
+#### Customizing parts with global CSS
+
+```css
+@import "tailwindcss";
+
 @layer components {
   bie-dropdown::part(trigger) {
     @apply rounded-lg px-4 py-2.5 text-sm font-medium;
@@ -257,42 +282,10 @@ Style `bie-dropdown` with Tailwind utility classes via CSS custom properties and
     @apply px-4 py-2 text-sm hover:bg-gray-100;
   }
 
-  bie-dropdown::part(search-input) {
-    @apply rounded-md border-gray-300 focus:ring-2 focus:ring-blue-500;
-  }
-
   bie-dropdown::part(reset) {
     @apply text-gray-400 hover:text-red-500 transition-colors;
   }
 }
-```
-
-#### Tailwind + CSS custom properties via theme config
-
-```js
-// tailwind.config.js
-module.exports = {
-  theme: {
-    extend: {
-      colors: {
-        bie: {
-          bg: '#ffffff',
-          border: '#d1d5db',
-          text: '#111827',
-          'hover-bg': '#f3f4f6',
-          'focus-ring': '#3b82f6',
-        },
-      },
-    },
-  },
-};
-```
-
-```html
-<bie-dropdown
-  class="[--bie-bg:theme(colors.bie.bg)] [--bie-border:theme(colors.bie.border)]
-         [--bie-text:theme(colors.bie.text)] [--bie-hover-bg:theme(colors.bie.hover-bg)]"
-></bie-dropdown>
 ```
 
 ## Keyboard
