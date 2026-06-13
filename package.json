@@ -1,0 +1,44 @@
+{
+  "name": "bie-dropdown",
+  "version": "0.1.0",
+  "description": "Searchable dropdown web component built with Lit",
+  "type": "module",
+  "main": "./dist/bie-dropdown.js",
+  "module": "./dist/bie-dropdown.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/bie-dropdown.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && tsc",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "web-component",
+    "dropdown",
+    "lit",
+    "custom-element",
+    "bie"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "lit": "^2.0.0 || ^3.0.0"
+  },
+  "devDependencies": {
+    "lit": "^3.3.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  }
+}

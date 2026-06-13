@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BIE Dropdown — Dev Preview</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        padding: 40px;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        margin-bottom: 24px;
+      }
+      .demo-group {
+        margin-bottom: 40px;
+      }
+      .demo-group > label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #555;
+      }
+      .result {
+        margin-top: 10px;
+        font-size: 13px;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>BIE Dropdown — Dev Preview</h1>
+
+    <!-- Demo 1: Basic searchable dropdown -->
+    <div class="demo-group">
+      <label>Basic Searchable Dropdown</label>
+      <bie-dropdown id="demo1" placeholder="Choose user..."></bie-dropdown>
+      <div class="result" id="result1"></div>
+    </div>
+
+    <!-- Demo 2: Dark themed -->
+    <div class="demo-group">
+      <label>Dark Themed</label>
+      <bie-dropdown
+        id="demo2"
+        style="
+          --bie-bg: #1e1e2e;
+          --bie-border: #45475a;
+          --bie-text: #cdd6f4;
+          --bie-hover-bg: #313244;
+          --bie-focus-ring: #cba6f7;
+        "
+      ></bie-dropdown>
+      <div class="result" id="result2"></div>
+    </div>
+
+    <!-- Demo 3: Non-searchable -->
+    <div class="demo-group">
+      <label>Non-searchable</label>
+      <bie-dropdown id="demo3" searchable="false"></bie-dropdown>
+      <div class="result" id="result3"></div>
+    </div>
+
+    <!-- Demo 4: Custom label key -->
+    <div class="demo-group">
+      <label>Custom Label Key (display "email")</label>
+      <bie-dropdown id="demo4" label-key="email" search-placeholder="Search email..."></bie-dropdown>
+      <div class="result" id="result4"></div>
+    </div>
+
+    <script type="module">
+      import './src/index.ts';
+
+      const users = [
+        { id: 1, name: 'John Doe', email: 'john@example.com' },
+        { id: 2, name: 'Jane Smith', email: 'jane@example.com' },
+        { id: 3, name: 'Michael Scott', email: 'michael@dundermifflin.com' },
+        { id: 4, name: 'Dwight Schrute', email: 'dwight@dundermifflin.com' },
+        { id: 5, name: 'Jim Halpert', email: 'jim@dundermifflin.com' },
+        { id: 6, name: 'Pam Beesly', email: 'pam@dundermifflin.com' },
+        { id: 7, name: 'Ryan Howard', email: 'ryan@dundermifflin.com' },
+        { id: 8, name: 'Kelly Kapoor', email: 'kelly@dundermifflin.com' },
+        { id: 9, name: 'Stanley Hudson', email: 'stanley@dundermifflin.com' },
+        { id: 10, name: 'Kevin Malone', email: 'kevin@dundermifflin.com' },
+      ];
+
+      // Demo 1
+      const demo1 = document.getElementById('demo1');
+      demo1.items = users;
+      demo1.addEventListener('bie-change', (e) => {
+        document.getElementById('result1').textContent =
+          `Selected: ${e.detail.name} (${e.detail.email})`;
+      });
+
+      // Demo 2
+      const demo2 = document.getElementById('demo2');
+      demo2.items = users;
+      demo2.placeholder = 'Dark theme dropdown';
+      demo2.addEventListener('bie-change', (e) => {
+        document.getElementById('result2').textContent =
+          `Selected: ${e.detail.name}`;
+      });
+
+      // Demo 3
+      const demo3 = document.getElementById('demo3');
+      demo3.items = users;
+      demo3.placeholder = 'No search, just pick';
+      demo3.addEventListener('bie-change', (e) => {
+        document.getElementById('result3').textContent =
+          `Selected: ${e.detail.name}`;
+      });
+
+      // Demo 4
+      const demo4 = document.getElementById('demo4');
+      demo4.items = users;
+      demo4.placeholder = 'Displaying email...';
+      demo4.addEventListener('bie-change', (e) => {
+        document.getElementById('result4').textContent =
+          `Selected: ${e.detail.email}`;
+      });
+    </script>
+  </body>
+</html>
