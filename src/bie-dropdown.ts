@@ -39,6 +39,8 @@ export type ItemLoader = (
  * @csspart search-input - The search input element.
  * @csspart options - The options list wrapper.
  * @csspart option - Individual option buttons.
+ * @csspart summary - Wrapper around trigger and reset button.
+ * @csspart reset - Button that clears the current selection.
  * @csspart empty - Empty state message.
  * @csspart loading - Loading indicator.
  * @csspart error - Error state message.
@@ -68,6 +70,37 @@ export class BieDropdown extends LitElement {
       user-select: none;
     }
 
+    /* ---- Summary ---- */
+    [part="summary"] {
+      display: flex;
+      border: 1px solid var(--_border);
+      border-radius: var(--_radius);
+      background: var(--_bg);
+      padding: 1px;
+    }
+
+    [part='reset'] {
+      display: none;
+      background-color: var(--_bg);
+    }
+
+    [part='reset']:hover {
+      background-color: color-mix(in srgb, var(--_text) 20%, transparent);
+    }
+
+    [part='summary'][data-selected] [part='reset'] {
+      display: inline-block;
+      padding: 0.5rem;
+      border: none;
+      border-radius: calc(var(--_radius) - 0.05rem);
+      color: var(--_text);
+      cursor: pointer;
+      box-sizing: border-box;
+      text-align: center;
+      font: inherit;
+      font-size: 0.625rem;
+    }
+
     /* ---- Trigger ---- */
 
     [part='trigger'] {
@@ -79,7 +112,7 @@ export class BieDropdown extends LitElement {
       width: 100%;
       padding: 0.5rem 0.75rem;
       background: var(--_bg);
-      border: 1px solid var(--_border);
+      border: none;
       border-radius: var(--_radius);
       color: var(--_text);
       cursor: pointer;
@@ -87,6 +120,10 @@ export class BieDropdown extends LitElement {
       text-align: left;
       font: inherit;
       font-size: inherit;
+    }
+
+    [part='summary'][data-selected] [part='trigger'] {
+      padding-right: 0;
     }
 
     [part='trigger']:focus-visible {
@@ -272,14 +309,14 @@ export class BieDropdown extends LitElement {
       border: none;
       background: transparent;
       display: flex;
-      flex-direction: column;
       align-items: flex-start;
       text-align: left;
       font: inherit;
       font-size: inherit;
       cursor: pointer;
-      padding: 0.5rem 0.75rem;
+      padding: 0.5rem calc(1.5rem + 1px);
       color: var(--_text);
+      position: relative;
     }
 
     [part='option']:hover {
@@ -293,6 +330,14 @@ export class BieDropdown extends LitElement {
 
     [part='option'][aria-selected='true'] {
       font-weight: 600;
+    }
+
+    [part='option'][aria-selected="true"]::before {
+      content: "✔";
+      color: color-mix(in srgb, var(--_text) 50%, transparent);
+      position: absolute;
+      top: 0.5rem;
+      left: 0.75rem;
     }
 
     /* ---- States ---- */
@@ -491,6 +536,9 @@ export class BieDropdown extends LitElement {
   @state()
   private _parentValue: unknown | null = null;
 
+  /** Guard to prevent re-entrant clear() calls from bubbling bie-change loops. */
+  private _clearing = false;
+
   // ---- Unique IDs ----
 
   private _uid = '';
@@ -570,20 +618,30 @@ export class BieDropdown extends LitElement {
     const waitingForParent = this.dependsOn && this._parentValue == null;
 
     return html`
-      <button
-        part="trigger"
-        type="button"
-        popovertarget="${this._popoverId}"
-        popovertargetaction="toggle"
-        aria-expanded="${this._open}"
-        ?data-waiting="${waitingForParent}"
-      >
-        <span
-          part="label"
-          ?data-placeholder="${!label}"
-        >${label || this.placeholder}</span>
-        <span part="arrow" aria-hidden="true">&#9660;</span>
-      </button>
+      <div part="summary" ?data-selected="${!!this.selected}">
+        <button
+          part="trigger"
+          type="button"
+          popovertarget="${this._popoverId}"
+          popovertargetaction="toggle"
+          aria-expanded="${this._open}"
+          ?data-waiting="${waitingForParent}"
+        >
+          <span
+            part="label"
+            ?data-placeholder="${!label}"
+          >${label || this.placeholder}</span>
+          <span part="arrow" aria-hidden="true">&#9660;</span>
+        </button>
+        <button
+          part="reset"
+          type="button"
+          aria-label="Clear selection"
+          @click="${this.clear}"
+        >
+          &#10005;
+        </button>
+      </div>
 
       <div
         id="${this._popoverId}"
@@ -657,7 +715,6 @@ export class BieDropdown extends LitElement {
           aria-selected="${item === this.selected}"
           ?data-active="${index === this._highlightedIndex}"
           @click="${() => this._select(item)}"
-          @mouseenter="${() => (this._highlightedIndex = index)}"
         >
           <span>${this._getLabel(item)}</span>
         </button>
@@ -685,7 +742,17 @@ export class BieDropdown extends LitElement {
 
   /** Reset selection to nothing. */
   clear() {
+    if (this._clearing) return;
+    this._clearing = true;
     this.selected = null;
+    this.dispatchEvent(
+      new CustomEvent('bie-change', {
+        detail: null,
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    this._clearing = false;
   }
 
   /** Returns whether the dropdown popover is currently open. */
@@ -901,10 +968,14 @@ export class BieDropdown extends LitElement {
   }
 
   private _onParentChange(e: Event) {
-    const detail = (e as CustomEvent).detail as Record<string, unknown>;
-    this._parentValue = this._extractParentValue(detail);
+    const detail = (e as CustomEvent).detail as Record<string, unknown> | null;
+    if (detail === null) {
+      this._parentValue = null;
+    } else {
+      this._parentValue = this._extractParentValue(detail);
+    }
     this._cachedItems = null; // invalidate cache on parent change
-    this.clear();
+    this.selected = null; // reset silently — don't dispatch bie-change (parent already did)
     this.reload();
   }
 

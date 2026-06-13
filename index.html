@@ -151,7 +151,7 @@
       demo1.items = users;
       demo1.addEventListener('bie-change', (e) => {
         document.getElementById('result1').textContent =
-          `Selected: ${e.detail.name} (${e.detail.email})`;
+          e.detail ? `Selected: ${e.detail.name} (${e.detail.email})` : '';
       });
 
       // Demo 2
@@ -160,7 +160,7 @@
       demo2.placeholder = 'Dark theme dropdown';
       demo2.addEventListener('bie-change', (e) => {
         document.getElementById('result2').textContent =
-          `Selected: ${e.detail.name}`;
+          e.detail ? `Selected: ${e.detail.name}` : '';
       });
 
       // Demo 3
@@ -169,7 +169,7 @@
       demo3.placeholder = 'No search, just pick';
       demo3.addEventListener('bie-change', (e) => {
         document.getElementById('result3').textContent =
-          `Selected: ${e.detail.name}`;
+          e.detail ? `Selected: ${e.detail.name}` : '';
       });
 
       // Demo 4
@@ -178,7 +178,7 @@
       demo4.placeholder = 'Displaying email...';
       demo4.addEventListener('bie-change', (e) => {
         document.getElementById('result4').textContent =
-          `Selected: ${e.detail.email}`;
+          e.detail ? `Selected: ${e.detail.email}` : '';
       });
 
       // Demo 5: Async loader — simulates API call
@@ -196,7 +196,7 @@
       };
       demo5.addEventListener('bie-change', (e) => {
         document.getElementById('result5').textContent =
-          `Selected: ${e.detail.name}`;
+          e.detail ? `Selected: ${e.detail.name}` : '';
       });
 
       // Demo 6: JSONPlaceholder real API
@@ -224,7 +224,7 @@
 
       demo6.addEventListener('bie-change', (e) => {
         document.getElementById('result6').textContent =
-          `Selected: ${e.detail.name} (@${e.detail.username})`;
+          e.detail ? `Selected: ${e.detail.name} (@${e.detail.username})` : '';
       });
 
       // Demo 7: Cascading dropdown
@@ -232,7 +232,7 @@
       demo7Parent.items = countries;
       demo7Parent.addEventListener('bie-change', (e) => {
         document.getElementById('result7-parent').textContent =
-          `Selected country: ${e.detail.name}`;
+          e.detail ? `Selected country: ${e.detail.name}` : '';
       });
 
       const demo7Child = document.getElementById('demo7-child');
@@ -247,7 +247,7 @@
       };
       demo7Child.addEventListener('bie-change', (e) => {
         document.getElementById('result7-child').textContent =
-          `Selected city: ${e.detail.name}`;
+          e.detail ? `Selected city: ${e.detail.name}` : '';
       });
     </script>
   </body>
