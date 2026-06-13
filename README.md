@@ -9,6 +9,7 @@ Searchable dropdown web component built with [Lit](https://lit.dev), using nativ
 - 📱 Responsive — fullscreen bottom sheet on mobile
 - 🎨 Customizable via CSS parts and custom properties
 - 📦 Framework-agnostic — works with React, Vue, Angular, or vanilla HTML
+- 🔗 **Cascading / dependent dropdown support** — child dropdown waits for parent selection
 
 ## Install
 
@@ -48,7 +49,7 @@ npm install bie-dropdown lit
 
 | Property | Attribute | Type | Default | Description |
 |---|---|---|---|---|
-| `items` | — | `Array<object> \| (query) => items` | `[]` | Static array or async loader function |
+| `items` | — | `Array<object> \| (query, parentValue?) => items` | `[]` | Static array or async loader function |
 | `labelKey` | `label-key` | `string` | `"name"` | Object key used for display text |
 | `searchKeys` | `search-keys` | `string` | `""` | Comma-separated keys to search against (only for static arrays) |
 | `placeholder` | `placeholder` | `string` | `"Select..."` | Text shown on trigger when nothing is selected |
@@ -56,6 +57,9 @@ npm install bie-dropdown lit
 | `searchable` | `searchable` | `boolean` | `true` | Show/hide the search input |
 | `searchDebounce` | `search-debounce` | `number` | `300` | Debounce delay in ms (only for async loader) |
 | `selected` | — | `object \| null` | `null` | Currently selected item (read-only) |
+| `dependsOn` | `depends-on` | `string` | `""` | CSS selector for a parent dropdown this one depends on |
+| `parentKey` | `parent-key` | `string` | `""` | Key to extract value from parent's selected item (if empty, full object is passed) |
+| `emptyMessage` | `empty-message` | `string` | `""` | Message shown when parent is not selected yet |
 
 ### Events
 
@@ -105,6 +109,66 @@ dropdown.items = async (query) => {
 
 ```html
 <bie-dropdown search-debounce="500"></bie-dropdown>
+```
+
+## Cascading Dropdown
+
+Link a child dropdown to a parent dropdown so that the child waits for the parent selection and reloads automatically.
+
+```html
+<bie-dropdown id="country" placeholder="Select Country..."></bie-dropdown>
+<bie-dropdown
+  id="city"
+  placeholder="Select City..."
+  depends-on="#country"
+  parent-key="id"
+  empty-message="Please select a country first"
+></bie-dropdown>
+```
+
+```js
+const city = document.getElementById('city');
+city.items = async (query, countryId) => {
+  if (!countryId) return [];
+  const res = await fetch(`/api/cities?country=${countryId}&q=${query}`);
+  return res.json();
+};
+```
+
+**Behavior:**
+- When `dependsOn` is set, the child dropdown listens for `bie-change` on the parent.
+- When the parent changes, the child **auto-clears** its selection and **reloads** with the new parent value.
+- The async loader receives the parent value as the **second argument** (`parentValue`).
+- If `parentKey` is set, only that property is extracted from the parent's selected item. If empty, the full selected object is passed.
+- While the parent has no selection, the popover still opens but shows `emptyMessage`.
+- **Caching**: full results are cached per parent value. Re-opening the dropdown with the same parent selection does **not** refetch — cached data is displayed instantly. Search input and parent changes always fetch fresh data.
+
+### Alpine.js Example
+
+```html
+<div x-data="{ selectedCountry: null }">
+  <bie-dropdown
+    id="country"
+    placeholder="Select Country..."
+    :items="[{id:1,name:'USA'},{id:2,name:'UK'}]"
+    @bie-change="selectedCountry = $event.detail"
+  ></bie-dropdown>
+
+  <bie-dropdown
+    id="city"
+    placeholder="Select City..."
+    depends-on="#country"
+    parent-key="id"
+    empty-message="Please select a country first"
+  ></bie-dropdown>
+</div>
+
+<script>
+  document.getElementById('city').items = async (query, countryId) => {
+    if (!countryId) return [];
+    // fetch cities...
+  };
+</script>
 ```
 
 ## Styling

@@ -61,6 +61,38 @@
       </div>
     </div>
 
+    <!-- Demo 3: Cascading dropdown -->
+    <div class="demo" x-data="cascadingDemo">
+      <label>Cascading Dropdown — Parent (Country)</label>
+      <bie-dropdown
+        id="alpine-country"
+        x-ref="country"
+        x-effect="$refs.country.items = countries"
+        @bie-change="selectedCountry = $event.detail"
+        placeholder="Select country..."
+      ></bie-dropdown>
+      <div class="result" x-show="selectedCountry">
+        Selected country:
+        <span x-text="selectedCountry?.name"></span>
+      </div>
+
+      <label style="margin-top: 16px;">Cascading Dropdown — Child (City, depends on Country)</label>
+      <bie-dropdown
+        id="alpine-city"
+        x-ref="city"
+        depends-on="#alpine-country"
+        parent-key="id"
+        empty-message="Please select a country first"
+        search-debounce="200"
+        @bie-change="selectedCity = $event.detail"
+        placeholder="Select city..."
+      ></bie-dropdown>
+      <div class="result" x-show="selectedCity">
+        Selected city:
+        <span x-text="selectedCity?.name"></span>
+      </div>
+    </div>
+
     <script type="module">
       import './src/index.ts';
     </script>
@@ -105,6 +137,52 @@
             );
           },
         }));
+      });
+
+      // Demo 3: Cascading dropdown
+      document.addEventListener('alpine:init', () => {
+        const cities = {
+          us: [
+            { id: 'nyc', name: 'New York City' },
+            { id: 'la', name: 'Los Angeles' },
+            { id: 'chi', name: 'Chicago' },
+          ],
+          uk: [
+            { id: 'lon', name: 'London' },
+            { id: 'man', name: 'Manchester' },
+            { id: 'liv', name: 'Liverpool' },
+          ],
+          jp: [
+            { id: 'tok', name: 'Tokyo' },
+            { id: 'osa', name: 'Osaka' },
+            { id: 'kyo', name: 'Kyoto' },
+          ],
+        };
+
+        Alpine.data('cascadingDemo', () => ({
+          countries: [
+            { id: 'us', name: 'United States' },
+            { id: 'uk', name: 'United Kingdom' },
+            { id: 'jp', name: 'Japan' },
+          ],
+          selectedCountry: null,
+          selectedCity: null,
+        }));
+
+        // Wire up the child loader imperatively after Alpine init
+        document.addEventListener('alpine:initialized', () => {
+          const cityDropdown = document.getElementById('alpine-city');
+          if (cityDropdown) {
+            cityDropdown.items = async (query, countryId) => {
+              if (!countryId) return [];
+              await new Promise((r) => setTimeout(r, 300));
+              const list = cities[countryId] || [];
+              if (!query) return list;
+              const q = query.toLowerCase();
+              return list.filter((c) => c.name.toLowerCase().includes(q));
+            };
+          }
+        });
       });
     </script>
   </body>

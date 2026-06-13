@@ -86,6 +86,26 @@
       <div class="result" id="result6"></div>
     </div>
 
+    <!-- Demo 7: Cascading / Dependent Dropdown -->
+    <div class="demo-group">
+      <label>Cascading Dropdown — Parent (Country)</label>
+      <bie-dropdown id="demo7-parent" placeholder="Select country..."></bie-dropdown>
+      <div class="result" id="result7-parent"></div>
+    </div>
+
+    <div class="demo-group">
+      <label>Cascading Dropdown — Child (City, depends on Country)</label>
+      <bie-dropdown
+        id="demo7-child"
+        placeholder="Select city..."
+        depends-on="#demo7-parent"
+        parent-key="id"
+        empty-message="Please select a country first"
+        search-debounce="200"
+      ></bie-dropdown>
+      <div class="result" id="result7-child"></div>
+    </div>
+
     <script type="module">
       import './src/index.ts';
 
@@ -101,6 +121,30 @@
         { id: 9, name: 'Stanley Hudson', email: 'stanley@dundermifflin.com' },
         { id: 10, name: 'Kevin Malone', email: 'kevin@dundermifflin.com' },
       ];
+
+      const countries = [
+        { id: 'us', name: 'United States' },
+        { id: 'uk', name: 'United Kingdom' },
+        { id: 'jp', name: 'Japan' },
+      ];
+
+      const cities = {
+        us: [
+          { id: 'nyc', name: 'New York City' },
+          { id: 'la', name: 'Los Angeles' },
+          { id: 'chi', name: 'Chicago' },
+        ],
+        uk: [
+          { id: 'lon', name: 'London' },
+          { id: 'man', name: 'Manchester' },
+          { id: 'liv', name: 'Liverpool' },
+        ],
+        jp: [
+          { id: 'tok', name: 'Tokyo' },
+          { id: 'osa', name: 'Osaka' },
+          { id: 'kyo', name: 'Kyoto' },
+        ],
+      };
 
       // Demo 1
       const demo1 = document.getElementById('demo1');
@@ -181,6 +225,29 @@
       demo6.addEventListener('bie-change', (e) => {
         document.getElementById('result6').textContent =
           `Selected: ${e.detail.name} (@${e.detail.username})`;
+      });
+
+      // Demo 7: Cascading dropdown
+      const demo7Parent = document.getElementById('demo7-parent');
+      demo7Parent.items = countries;
+      demo7Parent.addEventListener('bie-change', (e) => {
+        document.getElementById('result7-parent').textContent =
+          `Selected country: ${e.detail.name}`;
+      });
+
+      const demo7Child = document.getElementById('demo7-child');
+      demo7Child.items = async (query, countryId) => {
+        if (!countryId) return [];
+        // Simulate network delay
+        await new Promise((r) => setTimeout(r, 300));
+        const list = cities[countryId] || [];
+        if (!query) return list;
+        const q = query.toLowerCase();
+        return list.filter((c) => c.name.toLowerCase().includes(q));
+      };
+      demo7Child.addEventListener('bie-change', (e) => {
+        document.getElementById('result7-child').textContent =
+          `Selected city: ${e.detail.name}`;
       });
     </script>
   </body>

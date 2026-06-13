@@ -1,9 +1,12 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state, query } from 'lit/decorators.js';
 
-/** Function signature for async / sync item loaders. */
+/** Function signature for async / sync item loaders.
+ *  When `dependsOn` is set, the second argument receives the parent value.
+ */
 export type ItemLoader = (
   query: string,
+  parentValue?: unknown,
 ) => Record<string, unknown>[] | Promise<Record<string, unknown>[]>;
 
 /**
@@ -11,13 +14,16 @@ export type ItemLoader = (
  *
  * @element bie-dropdown
  *
- * @attr {Array|Function} items - Static array or async loader `(query) => items`.
+ * @attr {Array|Function} items - Static array or async loader `(query, parentValue?) => items`.
  * @attr {string} label-key - Property key used for display text (default: "name").
  * @attr {string} search-keys - Comma-separated property keys for client-side filter.
  * @attr {string} placeholder - Trigger text when nothing is selected.
  * @attr {string} search-placeholder - Placeholder for the search input.
  * @attr {boolean} searchable - Enable/disable the search input.
  * @attr {Object} selected - The currently selected item (read-only).
+ * @attr {string} depends-on - CSS selector for a parent dropdown this one depends on.
+ * @attr {string} parent-key - Key to extract value from parent's selected item.
+ * @attr {string} empty-message - Message shown when parent is not selected yet.
  *
  * @fires bie-change - Fired when an option is selected. `detail` contains the full item object.
  *
@@ -380,8 +386,9 @@ export class BieDropdown extends LitElement {
   /**
    * Items to display. Can be:
    * - **Array**: static items, filtered client-side using `searchKeys` / `labelKey`.
-   * - **Function**: `(query: string) => Record<string, unknown>[] | Promise<...>`
+   * - **Function**: `(query: string, parentValue?: unknown) => Record<string, unknown>[] | Promise<...>`
    *   Called on open and on search (debounced 300 ms). Disables client-side filtering.
+   *   If `dependsOn` is set, the second argument receives the extracted parent value.
    */
   @property({ attribute: false })
   items: Record<string, unknown>[] | ItemLoader = [];
@@ -439,6 +446,28 @@ export class BieDropdown extends LitElement {
   @property({ type: Object })
   selected: Record<string, unknown> | null = null;
 
+  /**
+   * CSS selector for a parent dropdown this one depends on.
+   * When set, this dropdown waits for the parent to have a selection
+   * before loading data. It also auto-clears when the parent changes.
+   */
+  @property({ type: String, attribute: 'depends-on' })
+  dependsOn = '';
+
+  /**
+   * Key to extract from the parent dropdown's selected item.
+   * If empty, the full selected object is passed to the loader.
+   */
+  @property({ type: String, attribute: 'parent-key' })
+  parentKey = '';
+
+  /**
+   * Message shown inside the popover when the parent dropdown has not
+   * been selected yet. Defaults to "Please select parent first".
+   */
+  @property({ type: String, attribute: 'empty-message' })
+  emptyMessage = '';
+
   // ---- Internal state ----
 
   @state()
@@ -459,6 +488,9 @@ export class BieDropdown extends LitElement {
   @state()
   private _error = '';
 
+  @state()
+  private _parentValue: unknown | null = null;
+
   // ---- Unique IDs ----
 
   private _uid = '';
@@ -468,6 +500,16 @@ export class BieDropdown extends LitElement {
 
   private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private _abortController: AbortController | null = null;
+
+  // ---- Parent dependency ----
+
+  private _parentEl: HTMLElement | null = null;
+  private _parentChangeHandler: ((e: Event) => void) | null = null;
+  private _parentListenerAttached = false;
+
+  /** Cache: last parentValue + full results to skip refetch on reopen. */
+  private _cachedParentValue: unknown = undefined;
+  private _cachedItems: Record<string, unknown>[] | null = null;
 
   // ---- Query refs ----
 
@@ -489,12 +531,17 @@ export class BieDropdown extends LitElement {
     if (!this._isLoader()) {
       this._filteredItems = [...this._getItemsArray()];
     }
+
+    if (this.dependsOn) {
+      this._attachParentListener();
+    }
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback();
     this._cancelDebounce();
     this._abortController?.abort();
+    this._detachParentListener();
   }
 
   override willUpdate(changed: Map<string, unknown>) {
@@ -502,12 +549,25 @@ export class BieDropdown extends LitElement {
       this._filteredItems = this._clientFilter(this._searchQuery);
       this._highlightedIndex = -1;
     }
+
+    if (changed.has('items')) {
+      this._cachedItems = null;
+    }
+
+    if (changed.has('dependsOn')) {
+      this._cachedItems = null;
+      this._detachParentListener();
+      if (this.dependsOn) {
+        this._attachParentListener();
+      }
+    }
   }
 
   // ---- Render ----
 
   override render() {
     const label = this._getLabel(this.selected);
+    const waitingForParent = this.dependsOn && this._parentValue == null;
 
     return html`
       <button
@@ -516,6 +576,7 @@ export class BieDropdown extends LitElement {
         popovertarget="${this._popoverId}"
         popovertargetaction="toggle"
         aria-expanded="${this._open}"
+        ?data-waiting="${waitingForParent}"
       >
         <span
           part="label"
@@ -546,7 +607,7 @@ export class BieDropdown extends LitElement {
           </div>
 
           <!-- Search -->
-          ${this.searchable
+          ${this.searchable && !waitingForParent
             ? html`
                 <div part="search">
                   <input
@@ -571,6 +632,10 @@ export class BieDropdown extends LitElement {
   }
 
   private _renderOptionsContent() {
+    if (this.dependsOn && this._parentValue == null) {
+      return html`<div part="empty">${this.emptyMessage || 'Please select parent first'}</div>`;
+    }
+
     if (this._loading) {
       return html`<div part="loading">Loading...</div>`;
     }
@@ -630,7 +695,7 @@ export class BieDropdown extends LitElement {
 
   /** Manually reload items (useful when `items` is a loader function). */
   reload() {
-    this._fetchItems(this._searchQuery);
+    this._fetchItems(this._searchQuery, this._parentValue ?? undefined);
   }
 
   // ---- Private: popover control ----
@@ -645,8 +710,18 @@ export class BieDropdown extends LitElement {
       this._highlightedIndex = -1;
       this._error = '';
 
-      if (this._isLoader()) {
-        this._fetchItems('');
+      if (this.dependsOn && this._parentValue == null) {
+        // Parent not selected yet — show empty state immediately
+        this._filteredItems = [];
+        this._loading = false;
+      } else if (this._isLoader()) {
+        // Use cache if parent value hasn't changed (avoids unnecessary refetch)
+        if (this._cachedItems !== null && this._parentValue === this._cachedParentValue) {
+          this._filteredItems = this._cachedItems;
+          this._loading = false;
+        } else {
+          this._fetchItems('', this._parentValue ?? undefined);
+        }
       } else {
         this._filteredItems = [...this._getItemsArray()];
       }
@@ -683,7 +758,11 @@ export class BieDropdown extends LitElement {
     this._highlightedIndex = -1;
 
     if (this._isLoader()) {
-      this._debouncedFetch(this._searchQuery);
+      if (this.dependsOn && this._parentValue == null) {
+        // Do nothing — parent not selected
+        return;
+      }
+      this._debouncedFetch(this._searchQuery, this._parentValue ?? undefined);
     } else {
       this._filteredItems = this._clientFilter(this._searchQuery);
     }
@@ -697,14 +776,14 @@ export class BieDropdown extends LitElement {
     return Array.isArray(this.items) ? this.items : [];
   }
 
-  private _debouncedFetch(query: string) {
+  private _debouncedFetch(query: string, parentValue?: unknown) {
     this._cancelDebounce();
     this._debounceTimer = setTimeout(() => {
-      this._fetchItems(query);
+      this._fetchItems(query, parentValue);
     }, this.searchDebounce);
   }
 
-  private async _fetchItems(query: string) {
+  private async _fetchItems(query: string, parentValue?: unknown) {
     // Cancel any in-flight request
     this._abortController?.abort();
     this._abortController = new AbortController();
@@ -712,9 +791,11 @@ export class BieDropdown extends LitElement {
     this._loading = true;
     this._error = '';
 
+    const currentParentValue = this._parentValue;
+
     try {
       const loader = this.items as ItemLoader;
-      const result = loader(query);
+      const result = loader(query, parentValue);
 
       // Handle both sync and async loaders
       const items = result instanceof Promise ? await result : result;
@@ -722,7 +803,16 @@ export class BieDropdown extends LitElement {
       // Don't update if request was aborted
       if (this._abortController.signal.aborted) return;
 
+      // Guard against parent value changing while loading
+      if (this._parentValue !== currentParentValue) return;
+
       this._filteredItems = items;
+
+      // Cache full results for reuse when reopen with same parent value
+      if (query === '' && !this._abortController.signal.aborted) {
+        this._cachedParentValue = currentParentValue;
+        this._cachedItems = items;
+      }
     } catch (err) {
       if (this._abortController.signal.aborted) return;
       this._error = err instanceof Error ? err.message : 'Failed to load items';
@@ -755,6 +845,67 @@ export class BieDropdown extends LitElement {
         return typeof val === 'string' && val.toLowerCase().includes(q);
       }),
     );
+  }
+
+  // ---- Private: parent dependency ----
+
+  private _findParent(): HTMLElement | null {
+    if (!this.dependsOn) return null;
+    try {
+      const el = (this.getRootNode() as Document | ShadowRoot).querySelector(this.dependsOn) as HTMLElement | null;
+      if (!el) {
+        console.warn(
+          `[bie-dropdown] dependsOn "${this.dependsOn}" did not match any element`,
+        );
+      }
+      return el;
+    } catch {
+      console.warn(
+        `[bie-dropdown] Invalid dependsOn selector: "${this.dependsOn}"`,
+      );
+      return null;
+    }
+  }
+
+  private _extractParentValue(parentSelected: Record<string, unknown>): unknown {
+    if (this.parentKey) {
+      return parentSelected[this.parentKey];
+    }
+    return parentSelected;
+  }
+
+  private _attachParentListener() {
+    if (this._parentListenerAttached) return;
+    const parent = this._findParent();
+    if (!parent) return;
+
+    this._parentEl = parent;
+    this._parentChangeHandler = this._onParentChange.bind(this);
+    parent.addEventListener('bie-change', this._parentChangeHandler);
+    this._parentListenerAttached = true;
+
+    // Sync initial parent value if parent already has a selection
+    const parentDropdown = parent as BieDropdown;
+    if (parentDropdown.selected) {
+      this._parentValue = this._extractParentValue(parentDropdown.selected);
+    }
+  }
+
+  private _detachParentListener() {
+    if (this._parentEl && this._parentChangeHandler) {
+      this._parentEl.removeEventListener('bie-change', this._parentChangeHandler);
+    }
+    this._parentEl = null;
+    this._parentChangeHandler = null;
+    this._parentListenerAttached = false;
+  }
+
+  private _onParentChange(e: Event) {
+    const detail = (e as CustomEvent).detail as Record<string, unknown>;
+    this._parentValue = this._extractParentValue(detail);
+    this._cachedItems = null; // invalidate cache on parent change
+    this.clear();
+    this.reload();
   }
 
   // ---- Private: keyboard ----
