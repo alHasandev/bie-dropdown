@@ -1,14 +1,19 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state, query } from 'lit/decorators.js';
 
+/** Function signature for async / sync item loaders. */
+export type ItemLoader = (
+  query: string,
+) => Record<string, unknown>[] | Promise<Record<string, unknown>[]>;
+
 /**
  * Searchable dropdown web component using Popover API and CSS Anchor Positioning.
  *
  * @element bie-dropdown
  *
- * @attr {Array} items - Array of objects to display as options.
+ * @attr {Array|Function} items - Static array or async loader `(query) => items`.
  * @attr {string} label-key - Property key used for display text (default: "name").
- * @attr {string} search-keys - Comma-separated property keys to search against.
+ * @attr {string} search-keys - Comma-separated property keys for client-side filter.
  * @attr {string} placeholder - Trigger text when nothing is selected.
  * @attr {string} search-placeholder - Placeholder for the search input.
  * @attr {boolean} searchable - Enable/disable the search input.
@@ -22,12 +27,15 @@ import { customElement, property, state, query } from 'lit/decorators.js';
  * @csspart popover - The popover container.
  * @csspart popover-inner - Inner wrapper inside the popover.
  * @csspart header - The popover header row.
+ * @csspart header-title - The header title (mobile only).
  * @csspart close - The close button inside the header.
  * @csspart search - The search input wrapper.
  * @csspart search-input - The search input element.
  * @csspart options - The options list wrapper.
  * @csspart option - Individual option buttons.
  * @csspart empty - Empty state message.
+ * @csspart loading - Loading indicator.
+ * @csspart error - Error state message.
  *
  * @cssprop {Color} [--bie-bg=#fff] - Background color.
  * @cssprop {Color} [--bie-border=#d1d5db] - Border color.
@@ -126,6 +134,7 @@ export class BieDropdown extends LitElement {
       transition:
         opacity 0.15s ease,
         translate 0.15s ease,
+        scale 0.15s ease,
         display 0.15s allow-discrete,
         overlay 0.15s allow-discrete;
       transition-behavior: allow-discrete;
@@ -134,16 +143,72 @@ export class BieDropdown extends LitElement {
     [part='popover']:popover-open {
       opacity: 1;
       translate: 0 0;
+      scale: 1;
     }
 
     @starting-style {
       [part='popover']:popover-open {
         opacity: 0;
         translate: 0 -0.5rem;
+        scale: 0.97;
       }
     }
 
-    /* ---- Header ---- */
+    /* ---- Anchor fallback (centered popover + visible header) ---- */
+
+    @supports not (anchor-name: --dd-trigger) {
+      [part='popover'] {
+        position: fixed;
+        inset: 0;
+        margin: auto;
+        width: 90vw;
+        max-width: 24rem;
+        height: fit-content;
+        max-height: 85vh;
+        border-radius: var(--_radius);
+        translate: 0 0;
+        scale: 0.95;
+        overflow: hidden;
+      }
+
+
+      [part='popover']::backdrop {
+        background: rgb(0 0 0 / 20%);
+        backdrop-filter: blur(2px);
+      }
+
+      [part='popover']:popover-open {
+        scale: 1;
+      }
+
+      @starting-style {
+        [part='popover']:popover-open {
+          scale: 0.95;
+          opacity: 0;
+        }
+      }
+
+      [part='options'] {
+        max-height: 50vh;
+        overflow: auto;
+      }
+
+      [part='header'] {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid var(--_border);
+      }
+
+      [part='header-title'] {
+        font-weight: 600;
+        font-size: 0.9375rem;
+      }
+    }
+
+    /* ---- Header (visible on mobile) ---- */
 
     [part='header'] {
       display: none;
@@ -224,12 +289,43 @@ export class BieDropdown extends LitElement {
       font-weight: 600;
     }
 
-    /* ---- Empty state ---- */
+    /* ---- States ---- */
+
+    [part='loading'] {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1.5rem 0.75rem;
+      color: #9ca3af;
+      font-size: 0.8125rem;
+    }
+
+    [part='loading']::before {
+      content: '';
+      width: 1rem;
+      height: 1rem;
+      border: 2px solid var(--_border);
+      border-top-color: var(--_focus-ring);
+      border-radius: 50%;
+      animation: bie-spin 0.6s linear infinite;
+    }
+
+    @keyframes bie-spin {
+      to { transform: rotate(360deg); }
+    }
 
     [part='empty'] {
       padding: 1.5rem 0.75rem;
       text-align: center;
       color: #9ca3af;
+      font-size: 0.8125rem;
+    }
+
+    [part='error'] {
+      padding: 1.5rem 0.75rem;
+      text-align: center;
+      color: #ef4444;
       font-size: 0.8125rem;
     }
 
@@ -282,11 +378,13 @@ export class BieDropdown extends LitElement {
   // ---- Public properties ----
 
   /**
-   * Items to display in the dropdown. Each item is an object.
-   * The property specified by `labelKey` is used for display.
+   * Items to display. Can be:
+   * - **Array**: static items, filtered client-side using `searchKeys` / `labelKey`.
+   * - **Function**: `(query: string) => Record<string, unknown>[] | Promise<...>`
+   *   Called on open and on search (debounced 300 ms). Disables client-side filtering.
    */
-  @property({ type: Array })
-  items: Record<string, unknown>[] = [];
+  @property({ attribute: false })
+  items: Record<string, unknown>[] | ItemLoader = [];
 
   /**
    * Object key used for the display label of each item.
@@ -297,6 +395,7 @@ export class BieDropdown extends LitElement {
 
   /**
    * Object keys to search against (comma-separated).
+   * Only used when `items` is a static array. Ignored for loader functions.
    * If empty, only `labelKey` is used.
    */
   @property({ type: String, attribute: 'search-keys' })
@@ -327,6 +426,13 @@ export class BieDropdown extends LitElement {
   searchable = true;
 
   /**
+   * Debounce delay in milliseconds for async loader searches.
+   * @default 300
+   */
+  @property({ type: Number, attribute: 'search-debounce' })
+  searchDebounce = 300;
+
+  /**
    * The currently selected item (read-only from outside).
    * Use the `bie-change` event to react to selections.
    */
@@ -347,10 +453,21 @@ export class BieDropdown extends LitElement {
   @state()
   private _searchQuery = '';
 
+  @state()
+  private _loading = false;
+
+  @state()
+  private _error = '';
+
   // ---- Unique IDs ----
 
   private _uid = '';
   private _popoverId = '';
+
+  // ---- Async helpers ----
+
+  private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private _abortController: AbortController | null = null;
 
   // ---- Query refs ----
 
@@ -369,12 +486,20 @@ export class BieDropdown extends LitElement {
     super.connectedCallback();
     this._uid = crypto.randomUUID();
     this._popoverId = `dd-popover-${this._uid}`;
-    this._filteredItems = [...this.items];
+    if (!this._isLoader()) {
+      this._filteredItems = [...this._getItemsArray()];
+    }
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    this._cancelDebounce();
+    this._abortController?.abort();
   }
 
   override willUpdate(changed: Map<string, unknown>) {
-    if (changed.has('items')) {
-      this._filteredItems = this._filter(this._searchQuery);
+    if (changed.has('items') && !this._isLoader()) {
+      this._filteredItems = this._clientFilter(this._searchQuery);
       this._highlightedIndex = -1;
     }
   }
@@ -406,7 +531,7 @@ export class BieDropdown extends LitElement {
         @toggle="${this._onPopoverToggle}"
       >
         <div part="popover-inner">
-          <!-- Header -->
+          <!-- Header (mobile) -->
           <div part="header">
             <span part="header-title">${this.placeholder}</span>
             <button
@@ -436,30 +561,43 @@ export class BieDropdown extends LitElement {
               `
             : nothing}
 
-          <!-- Options -->
+          <!-- Options / States -->
           <div part="options" role="listbox">
-            ${this._filteredItems.length === 0
-              ? html`<div part="empty">No results found</div>`
-              : this._filteredItems.map(
-                  (item, index) => html`
-                    <button
-                      part="option"
-                      type="button"
-                      role="option"
-                      aria-selected="${item === this.selected}"
-                      ?data-active="${index === this._highlightedIndex}"
-                      @click="${() => this._select(item)}"
-                      @mouseenter="${() =>
-                        (this._highlightedIndex = index)}"
-                    >
-                      <span>${this._getLabel(item)}</span>
-                    </button>
-                  `
-                )}
+            ${this._renderOptionsContent()}
           </div>
         </div>
       </div>
     `;
+  }
+
+  private _renderOptionsContent() {
+    if (this._loading) {
+      return html`<div part="loading">Loading...</div>`;
+    }
+
+    if (this._error) {
+      return html`<div part="error">${this._error}</div>`;
+    }
+
+    if (this._filteredItems.length === 0) {
+      return html`<div part="empty">No results found</div>`;
+    }
+
+    return this._filteredItems.map(
+      (item, index) => html`
+        <button
+          part="option"
+          type="button"
+          role="option"
+          aria-selected="${item === this.selected}"
+          ?data-active="${index === this._highlightedIndex}"
+          @click="${() => this._select(item)}"
+          @mouseenter="${() => (this._highlightedIndex = index)}"
+        >
+          <span>${this._getLabel(item)}</span>
+        </button>
+      `,
+    );
   }
 
   override updated(changed: Map<string, unknown>) {
@@ -490,6 +628,11 @@ export class BieDropdown extends LitElement {
     return this._open;
   }
 
+  /** Manually reload items (useful when `items` is a loader function). */
+  reload() {
+    this._fetchItems(this._searchQuery);
+  }
+
   // ---- Private: popover control ----
 
   private _onPopoverToggle(e: Event) {
@@ -499,8 +642,15 @@ export class BieDropdown extends LitElement {
 
     if (isOpen) {
       this._searchQuery = '';
-      this._filteredItems = [...this.items];
       this._highlightedIndex = -1;
+      this._error = '';
+
+      if (this._isLoader()) {
+        this._fetchItems('');
+      } else {
+        this._filteredItems = [...this._getItemsArray()];
+      }
+
       requestAnimationFrame(() => {
         this._searchInputEl?.focus();
       });
@@ -519,32 +669,91 @@ export class BieDropdown extends LitElement {
         detail: item,
         bubbles: true,
         composed: true,
-      })
+      }),
     );
 
     this.requestUpdate('selected', old);
   }
 
-  // ---- Private: search / filter ----
+  // ---- Private: search / data loading ----
 
   private _onSearchInput(e: Event) {
     const input = e.target as HTMLInputElement;
     this._searchQuery = input.value;
-    this._filteredItems = this._filter(this._searchQuery);
     this._highlightedIndex = -1;
+
+    if (this._isLoader()) {
+      this._debouncedFetch(this._searchQuery);
+    } else {
+      this._filteredItems = this._clientFilter(this._searchQuery);
+    }
   }
 
-  private _filter(query: string): Record<string, unknown>[] {
-    if (!query) return [...this.items];
+  private _isLoader(): boolean {
+    return typeof this.items === 'function';
+  }
+
+  private _getItemsArray(): Record<string, unknown>[] {
+    return Array.isArray(this.items) ? this.items : [];
+  }
+
+  private _debouncedFetch(query: string) {
+    this._cancelDebounce();
+    this._debounceTimer = setTimeout(() => {
+      this._fetchItems(query);
+    }, this.searchDebounce);
+  }
+
+  private async _fetchItems(query: string) {
+    // Cancel any in-flight request
+    this._abortController?.abort();
+    this._abortController = new AbortController();
+
+    this._loading = true;
+    this._error = '';
+
+    try {
+      const loader = this.items as ItemLoader;
+      const result = loader(query);
+
+      // Handle both sync and async loaders
+      const items = result instanceof Promise ? await result : result;
+
+      // Don't update if request was aborted
+      if (this._abortController.signal.aborted) return;
+
+      this._filteredItems = items;
+    } catch (err) {
+      if (this._abortController.signal.aborted) return;
+      this._error = err instanceof Error ? err.message : 'Failed to load items';
+      this._filteredItems = [];
+    } finally {
+      if (!this._abortController.signal.aborted) {
+        this._loading = false;
+      }
+    }
+  }
+
+  private _cancelDebounce() {
+    if (this._debounceTimer != null) {
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = null;
+    }
+  }
+
+  /** Client-side filtering (only used when `items` is a static array). */
+  private _clientFilter(query: string): Record<string, unknown>[] {
+    const items = this._getItemsArray();
+    if (!query) return [...items];
 
     const q = query.toLowerCase();
     const keys = this._getSearchKeys();
 
-    return this.items.filter((item) =>
+    return items.filter((item) =>
       keys.some((key) => {
         const val = item[key];
         return typeof val === 'string' && val.toLowerCase().includes(q);
-      })
+      }),
     );
   }
 
@@ -556,7 +765,7 @@ export class BieDropdown extends LitElement {
         e.preventDefault();
         this._highlightedIndex = Math.min(
           this._highlightedIndex + 1,
-          this._filteredItems.length - 1
+          this._filteredItems.length - 1,
         );
         break;
 

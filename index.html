@@ -72,6 +72,20 @@
       <div class="result" id="result4"></div>
     </div>
 
+    <!-- Demo 5: Async loader (simulated API) -->
+    <div class="demo-group">
+      <label>Async Loader (simulated 500ms API)</label>
+      <bie-dropdown id="demo5" placeholder="Search users via API..." search-debounce="400"></bie-dropdown>
+      <div class="result" id="result5"></div>
+    </div>
+
+    <!-- Demo 6: JSONPlaceholder API -->
+    <div class="demo-group">
+      <label>JSONPlaceholder API (https://jsonplaceholder.typicode.com/users)</label>
+      <bie-dropdown id="demo6" placeholder="Fetching from real API..." search-debounce="300"></bie-dropdown>
+      <div class="result" id="result6"></div>
+    </div>
+
     <script type="module">
       import './src/index.ts';
 
@@ -121,6 +135,52 @@
       demo4.addEventListener('bie-change', (e) => {
         document.getElementById('result4').textContent =
           `Selected: ${e.detail.email}`;
+      });
+
+      // Demo 5: Async loader — simulates API call
+      const demo5 = document.getElementById('demo5');
+      demo5.items = async (query) => {
+        // Simulate network delay
+        await new Promise((r) => setTimeout(r, 500));
+
+        const q = query.toLowerCase();
+        return users.filter(
+          (u) =>
+            u.name.toLowerCase().includes(q) ||
+            u.email.toLowerCase().includes(q)
+        );
+      };
+      demo5.addEventListener('bie-change', (e) => {
+        document.getElementById('result5').textContent =
+          `Selected: ${e.detail.name}`;
+      });
+
+      // Demo 6: JSONPlaceholder real API
+      const demo6 = document.getElementById('demo6');
+      let _cachedUsers = null;
+
+      demo6.items = async (query) => {
+        // Fetch once, cache for subsequent searches
+        if (!_cachedUsers) {
+          const res = await fetch(
+            'https://jsonplaceholder.typicode.com/users'
+          );
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          _cachedUsers = await res.json();
+        }
+
+        const q = query.toLowerCase();
+        return _cachedUsers.filter(
+          (u) =>
+            u.name.toLowerCase().includes(q) ||
+            u.email.toLowerCase().includes(q) ||
+            u.username.toLowerCase().includes(q)
+        );
+      };
+
+      demo6.addEventListener('bie-change', (e) => {
+        document.getElementById('result6').textContent =
+          `Selected: ${e.detail.name} (@${e.detail.username})`;
       });
     </script>
   </body>
