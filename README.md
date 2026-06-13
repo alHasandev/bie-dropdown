@@ -2,7 +2,7 @@
 
 Searchable dropdown web component built with [Lit](https://lit.dev), using native **Popover API** and **CSS Anchor Positioning**.
 
-- 🪶 **11.6 kB** bundled (3.4 kB gzipped) + `lit` as peer dependency
+- 🪶 **19.8 kB** bundled (5.0 kB gzipped) + `lit` as peer dependency
 - 🔍 Built-in search/filter
 - 🎯 Native popover — no z-index hacks
 - ⌨️ Full keyboard navigation (↑↓ Enter Escape)
@@ -65,7 +65,7 @@ npm install bie-dropdown lit
 
 | Event | Detail | Description |
 |---|---|---|
-| `bie-change` | The full item object | Fired when an option is selected |
+| `bie-change` | The full item object, or `null` when cleared | Fired when an option is selected or selection is reset |
 
 ### Methods
 
@@ -189,6 +189,8 @@ bie-dropdown {
 ### CSS Parts
 
 ```css
+bie-dropdown::part(summary) { }      /* Wrapper around trigger and reset button */
+bie-dropdown::part(reset) { }        /* Button to clear the current selection */
 bie-dropdown::part(trigger) { }      /* Trigger button */
 bie-dropdown::part(arrow) { }        /* Dropdown arrow icon */
 bie-dropdown::part(label) { }        /* Trigger label text */
