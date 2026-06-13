@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>bie-dropdown + Alpine.js</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        padding: 40px;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      h1 { font-size: 20px; }
+      .demo { margin-bottom: 40px; }
+      .demo label {
+        display: block; font-size: 13px; font-weight: 600;
+        margin-bottom: 8px; color: #555;
+      }
+      .result { margin-top: 10px; font-size: 13px; color: #666; }
+    </style>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+  </head>
+  <body>
+    <h1>bie-dropdown + Alpine.js</h1>
+
+    <!-- Demo 1: Static items from Alpine data -->
+    <div class="demo" x-data="staticDemo">
+      <label>Static items (from Alpine x-data)</label>
+      <bie-dropdown
+        x-ref="dd"
+        x-effect="$refs.dd.items = users"
+        @bie-change="selected = $event.detail"
+        placeholder="Choose user..."
+      ></bie-dropdown>
+      <div class="result" x-show="selected">
+        Selected:
+        <span x-text="selected?.name"></span>
+        (<span x-text="selected?.email"></span>)
+      </div>
+    </div>
+
+    <!-- Demo 2: Async loader from Alpine -->
+    <div class="demo" x-data="asyncDemo">
+      <label>Async loader (JSONPlaceholder via Alpine)</label>
+      <bie-dropdown
+        x-ref="dd"
+        x-init="$refs.dd.items = loadUsers"
+        @bie-change="selected = $event.detail"
+        placeholder="Fetching from API..."
+        search-debounce="300"
+      ></bie-dropdown>
+      <div class="result" x-show="selected">
+        Selected:
+        <span x-text="selected?.name"></span>
+        —
+        <span x-text="selected?.email"></span>
+      </div>
+    </div>
+
+    <script type="module">
+      import './src/index.ts';
+    </script>
+
+    <script>
+      // Demo 1: Static items from Alpine
+      document.addEventListener('alpine:init', () => {
+        Alpine.data('staticDemo', () => ({
+          users: [
+            { id: 1, name: 'John Doe', email: 'john@example.com' },
+            { id: 2, name: 'Jane Smith', email: 'jane@example.com' },
+            { id: 3, name: 'Michael Scott', email: 'michael@dm.com' },
+            { id: 4, name: 'Dwight Schrute', email: 'dwight@dm.com' },
+            { id: 5, name: 'Jim Halpert', email: 'jim@dm.com' },
+          ],
+          selected: null,
+        }));
+      });
+
+      // Demo 2: Async loader from Alpine
+      document.addEventListener('alpine:init', () => {
+        let cached = null;
+
+        Alpine.data('asyncDemo', () => ({
+          selected: null,
+
+          async loadUsers(query) {
+            // Fetch once from JSONPlaceholder, cache for next searches
+            if (!cached) {
+              const res = await fetch(
+                'https://jsonplaceholder.typicode.com/users'
+              );
+              cached = await res.json();
+            }
+
+            const q = query.toLowerCase();
+            return cached.filter(
+              (u) =>
+                u.name.toLowerCase().includes(q) ||
+                u.email.toLowerCase().includes(q) ||
+                u.username.toLowerCase().includes(q)
+            );
+          },
+        }));
+      });
+    </script>
+  </body>
+</html>
