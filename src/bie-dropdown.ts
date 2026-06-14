@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state, query } from 'lit/decorators.js';
+import { when } from 'lit/directives/when.js';
 
 /** Function signature for async / sync item loaders.
  *  When `dependsOn` is set, the second argument receives the parent value.
@@ -306,7 +307,7 @@ export class BieDropdown extends LitElement {
       overflow: auto;
     }
 
-    [part='option'] {
+    [part~='option'] {
       appearance: none;
       width: 100%;
       border: none;
@@ -322,21 +323,20 @@ export class BieDropdown extends LitElement {
       position: relative;
     }
 
-    [part='option']:hover {
+    [part~='option']:hover {
       background: var(--_hover-bg);
     }
 
-    [part='option'][data-active] {
+    [part~='option'][data-active] {
       background: var(--_hover-bg);
       outline: none;
     }
 
-    [part='option'][aria-selected='true'] {
+    [part~='option'][aria-selected='true'] {
       font-weight: 600;
     }
 
-    [part='option'][aria-selected="true"]::before {
-      content: "✔";
+    [part='option-check'] {
       color: color-mix(in srgb, var(--_text) 50%, transparent);
       position: absolute;
       top: 0.5rem;
@@ -635,8 +635,9 @@ export class BieDropdown extends LitElement {
   @query('[part="options"]')
   private _optionsEl!: HTMLElement | null;
 
-  // ---- Lifecycle ----
+  private _templateOptionItem: HTMLTemplateElement | null = null;
 
+  // ---- Lifecycle ----
   override connectedCallback() {
     super.connectedCallback();
     this._uid = crypto.randomUUID();
@@ -648,6 +649,10 @@ export class BieDropdown extends LitElement {
     if (this.dependsOn) {
       this._attachParentListener();
     }
+
+    this._templateOptionItem =
+      this.querySelector('template[slot="option-template"]') ??
+      this.querySelector('template');
   }
 
   override disconnectedCallback() {
@@ -658,6 +663,12 @@ export class BieDropdown extends LitElement {
   }
 
   override willUpdate(changed: Map<string, unknown>) {
+    if (!this._templateOptionItem) {
+      this._templateOptionItem =
+        this.querySelector('template[slot="option-template"]') ??
+        this.querySelector('template');
+    }
+
     if (changed.has('items') && !this._isLoader()) {
       this._filteredItems = this._clientFilter(this._searchQuery);
       this._highlightedIndex = -1;
@@ -784,19 +795,79 @@ export class BieDropdown extends LitElement {
     }
 
     return this._filteredItems.map(
-      (item, index) => html`
+      (item, index) => {
+        const parts = ['option'];
+        const isSelected = item === this.selected
+        if(isSelected) {
+          parts.push('option-selected')
+        }
+        return html`
         <button
-          part="option"
+          part="${parts.join(' ').trim()}"
           type="button"
           role="option"
-          aria-selected="${item === this.selected}"
+          aria-selected="${isSelected}"
           ?data-active="${index === this._highlightedIndex}"
           @click="${() => this._select(item)}"
         >
-          <span>${this._getLabel(item)}</span>
+          ${when(isSelected, () => html`<slot name="option-check"><span part="option-check">✔</span></slot>`)}
+          ${this._renderOptionItem(item)}
         </button>
-      `,
+      `
+      },
     );
+  }
+
+  private _interpolateTemplate(
+    element: Node,
+    data: Record<string, unknown>,
+  ) {
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+    );
+
+    let node: Text | null;
+    // console.log(walker.nextNode().nextSibling, data)
+
+    while ((node = walker.nextNode() as Text | null)) {
+      node.textContent = this._dotItem(data, node.textContent);
+    }
+
+    return element;
+  }
+
+  private _dotItem(item: Record<string, unknown>, content: string)
+  {
+    if (!item) return '';
+    if(!content) return '';
+
+
+    return content.replace(/\{([\w.]+)\}/g, (_, path) => {
+      const keys = path.split('.');
+      if (keys.length > 2) return '';
+
+      let val = item[keys[0]];
+      if (keys.length === 2 && val && typeof val === 'object') {
+        val = (val as Record<string, unknown>)[keys[1]];
+      }
+
+      return typeof val === 'string' ? val : String(val ?? '');
+    });
+  } 
+
+  private _renderOptionItem(item: Record<string, unknown>) {
+    if(!this._templateOptionItem) {
+      return html`<span part="option-item">${this._getLabel(item)}</span>`
+    }
+
+    const optionItem = this._templateOptionItem.content.querySelector('[part="option-item"]')?.cloneNode(true)
+    if(!optionItem) {
+      return html`<span part="option-item">${this._getLabel(item)}</span>`
+    }
+
+    this._interpolateTemplate(optionItem, item);
+    return optionItem
   }
 
   override updated(changed: Map<string, unknown>) {

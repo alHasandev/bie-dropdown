@@ -117,6 +117,51 @@ dropdown.items = async (query) => {
 <bie-dropdown search-debounce="500"></bie-dropdown>
 ```
 
+## Custom Option Template
+
+Customise how each option is rendered by placing a `<template>` inside `<bie-dropdown>`.
+
+```html
+<bie-dropdown>
+  <template slot="option-template">
+    <div part="option-item">
+      <p part="option-item-name">{name}</p>
+      <p part="option-item-email">{email}</p>
+    </div>
+  </template>
+</bie-dropdown>
+
+<script type="module">
+  import 'bie-dropdown';
+
+  const dropdown = document.querySelector('bie-dropdown');
+  dropdown.items = [
+    { id: 1, name: 'John Doe', email: 'john@example.com' },
+    { id: 2, name: 'Jane Smith', email: 'jane@example.com' },
+  ];
+</script>
+```
+
+**Notes:**
+- Placeholder `{fieldName}` is replaced from item data. Nested fields (`{address.city}`) are supported up to depth 2.
+- Replacement only works on **text nodes**, not HTML attributes.
+- The template root element **must** have `part="option-item"` to be picked up by the component.
+- Style the template elements via CSS parts (e.g., `bie-dropdown::part(option-item-name)`) or inline styles — class-based styling from outside the shadow DOM **does not** apply.
+- **Checkmark slot:** add `<span slot="option-check">...</span>` in light DOM to customise the selected indicator.
+
+**Styling the custom template:**
+
+```css
+bie-dropdown::part(option-item-name) {
+  font-weight: 600;
+}
+
+bie-dropdown::part(option-item-email) {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+```
+
 ## Cascading Dropdown
 
 Link a child dropdown to a parent dropdown so that the child waits for the parent selection and reloads automatically.
