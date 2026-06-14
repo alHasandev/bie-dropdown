@@ -37,8 +37,9 @@ npm install bie-dropdown lit
     { id: 2, name: 'Jane Smith', email: 'jane@example.com' },
   ];
 
-  dropdown.addEventListener('bie-change', (e) => {
-    console.log('Selected:', e.detail); // the full item object
+  dropdown.addEventListener('change', (e) => {
+    console.log('Selected:', e.target.selected); // the full item object
+    console.log('Value:', e.target.value);       // "1" (uses valueKey default "id")
   });
 </script>
 ```
@@ -50,22 +51,27 @@ npm install bie-dropdown lit
 | Property | Attribute | Type | Default | Description |
 |---|---|---|---|---|
 | `items` | — | `Array<object> \| (query, parentValue?) => items` | `[]` | Static array or async loader function |
-| `labelKey` | `label-key` | `string` | `"name"` | Object key used for display text |
+| `labelKey` | `label-key` | `string` | `"name"` | Object key used for display text (ignored if `labelTemplate` is set) |
+| `labelTemplate` | `label-template` | `string` | `""` | Template string for display label (e.g. `"{name} ({email})"`). Supports nested fields up to depth 2. |
+| `valueKey` | `value-key` | `string` | `"id"` | Object key used for the `value` property. Read by `wire:model`. |
+| `value` | — | `string \| null` | — | Read/write string representation of current selection. Derived from `selected[valueKey]`. |
 | `searchKeys` | `search-keys` | `string` | `""` | Comma-separated keys to search against (only for static arrays) |
 | `placeholder` | `placeholder` | `string` | `"Select..."` | Text shown on trigger when nothing is selected |
 | `searchPlaceholder` | `search-placeholder` | `string` | `"Search..."` | Placeholder for the search input |
 | `searchable` | `searchable` | `boolean` | `true` | Show/hide the search input |
 | `searchDebounce` | `search-debounce` | `number` | `300` | Debounce delay in ms (only for async loader) |
-| `selected` | — | `object \| null` | `null` | Currently selected item (read-only) |
+| `selected` | — | `object \| null` | `null` | Currently selected item. Use `value` + `change` event for form binding. |
 | `dependsOn` | `depends-on` | `string` | `""` | CSS selector for a parent dropdown this one depends on |
 | `parentKey` | `parent-key` | `string` | `""` | Key to extract value from parent's selected item (if empty, full object is passed) |
 | `emptyMessage` | `empty-message` | `string` | `""` | Message shown when parent is not selected yet |
 
 ### Events
 
-| Event | Detail | Description |
-|---|---|---|
-| `bie-change` | The full item object, or `null` when cleared | Fired when an option is selected or selection is reset |
+| Event | Description |
+|---|---|
+| `input` | Standard input event. Fires on every selection/clear. Used by `wire:model.live`. |
+| `change` | Standard change event. Fires on every selection/clear. Used by `wire:model`. |
+| `selected` (property) | Access `e.target.selected` for the full item object, or `e.target.value` for the string value. |
 
 ### Methods
 
@@ -136,7 +142,7 @@ city.items = async (query, countryId) => {
 ```
 
 **Behavior:**
-- When `dependsOn` is set, the child dropdown listens for `bie-change` on the parent.
+- When `dependsOn` is set, the child dropdown listens for `change` on the parent.
 - When the parent changes, the child **auto-clears** its selection and **reloads** with the new parent value.
 - The async loader receives the parent value as the **second argument** (`parentValue`).
 - If `parentKey` is set, only that property is extracted from the parent's selected item. If empty, the full selected object is passed.
@@ -151,7 +157,7 @@ city.items = async (query, countryId) => {
     id="country"
     placeholder="Select Country..."
     :items="[{id:1,name:'USA'},{id:2,name:'UK'}]"
-    @bie-change="selectedCountry = $event.detail"
+    @change="selectedCountry = $event.target.selected"
   ></bie-dropdown>
 
   <bie-dropdown
@@ -317,7 +323,7 @@ Requires **Popover API** and **CSS Anchor Positioning**:
   <bie-dropdown
     x-ref="dd"
     x-effect="$refs.dd.items = users"
-    @bie-change="selected = $event.detail"
+    @change="selected = $event.target.selected"
   ></bie-dropdown>
 
   <p x-show="selected" x-text="selected?.name"></p>
@@ -330,7 +336,143 @@ Requires **Popover API** and **CSS Anchor Positioning**:
 |---|---|
 | Static items from Alpine data | `x-effect="$refs.dd.items = users"` |
 | Async loader from Alpine | `x-init="$refs.dd.items = myLoaderFn"` |
-| React to selection | `@bie-change="selected = $event.detail"` |
+| React to selection | `@change="selected = $event.target.selected"` |
+
+### Livewire 4.x
+
+`bie-dropdown` is natively compatible with Livewire 4.x `wire:model` via standard `input`/`change` events and the `value` property.
+
+```blade
+{{-- resources/views/livewire/user-selector.blade.php --}}
+<div>
+    <bie-dropdown
+        wire:model="userId"
+        :items="$users"
+        value-key="id"
+        label-template="{name} ({email})"
+        placeholder="Select a user..."
+    ></bie-dropdown>
+
+    <p>Selected ID: {{ $userId }}</p>
+</div>
+```
+
+```php
+// app/Livewire/UserSelector.php
+namespace App\Livewire;
+
+use Livewire\Component;
+
+class UserSelector extends Component
+{
+    public $userId = null;
+    public $users = [];
+
+    public function mount()
+    {
+        $this->users = User::select('id', 'name', 'email')->get()->toArray();
+    }
+
+    public function render()
+    {
+        return view('livewire.user-selector');
+    }
+}
+```
+
+#### With `wire:model.live`
+
+```blade
+{{-- Real-time updates as user selects --}}
+<bie-dropdown
+    wire:model.live="userId"
+    value-key="id"
+    placeholder="Search and select..."
+></bie-dropdown>
+```
+
+#### Async Loader with Livewire
+
+```blade
+<div>
+    <bie-dropdown
+        id="user-search"
+        wire:model.live="userId"
+        value-key="id"
+        placeholder="Type to search..."
+        search-debounce="300"
+    ></bie-dropdown>
+</div>
+
+@script
+<script>
+    const dd = document.getElementById('user-search');
+    dd.items = async (query) => {
+        return await $wire.searchUsers(query);
+    };
+</script>
+@endscript
+```
+
+```php
+public function searchUsers($query)
+{
+    return User::where('name', 'like', "%{$query}%")
+        ->select('id', 'name', 'email')
+        ->get()
+        ->toArray();
+}
+```
+
+#### Cascading with Livewire
+
+```blade
+<div>
+    <bie-dropdown
+        id="lw-country"
+        wire:model="countryId"
+        :items="$countries"
+        value-key="id"
+        placeholder="Select country..."
+    ></bie-dropdown>
+
+    <bie-dropdown
+        wire:model="cityId"
+        value-key="id"
+        depends-on="#lw-country"
+        parent-key="id"
+        empty-message="Please select a country first"
+        label-template="{name}, {countryName}"
+        placeholder="Select city..."
+    ></bie-dropdown>
+</div>
+
+@script
+<script>
+    document.querySelector('[depends-on="#lw-country"]').items = async (query, countryId) => {
+        return await $wire.searchCities(query, countryId);
+    };
+</script>
+@endscript
+```
+
+#### Programmatic `value` setter (bidirectional)
+
+```blade
+@script
+<script>
+    // Livewire sets value from server → dropdown auto-selects matching item
+    $wire.$watch('userId', (value) => {
+        document.querySelector('bie-dropdown').value = value;
+    });
+
+    // Dropdown selection → sync to Livewire
+    document.querySelector('bie-dropdown').addEventListener('change', (e) => {
+        // e.target.value already set — wire:model handles this automatically
+    });
+</script>
+@endscript
+```
 
 ### React / Vue / Others
 

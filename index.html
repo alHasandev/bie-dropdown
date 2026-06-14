@@ -149,36 +149,40 @@
       // Demo 1
       const demo1 = document.getElementById('demo1');
       demo1.items = users;
-      demo1.addEventListener('bie-change', (e) => {
+      demo1.addEventListener('change', (e) => {
+        const item = e.target.selected;
         document.getElementById('result1').textContent =
-          e.detail ? `Selected: ${e.detail.name} (${e.detail.email})` : '';
+          item ? `Selected: ${item.name} (${item.email})` : '';
       });
 
       // Demo 2
       const demo2 = document.getElementById('demo2');
       demo2.items = users;
       demo2.placeholder = 'Dark theme dropdown';
-      demo2.addEventListener('bie-change', (e) => {
+      demo2.addEventListener('change', (e) => {
+        const item = e.target.selected;
         document.getElementById('result2').textContent =
-          e.detail ? `Selected: ${e.detail.name}` : '';
+          item ? `Selected: ${item.name}` : '';
       });
 
       // Demo 3
       const demo3 = document.getElementById('demo3');
       demo3.items = users;
       demo3.placeholder = 'No search, just pick';
-      demo3.addEventListener('bie-change', (e) => {
+      demo3.addEventListener('change', (e) => {
+        const item = e.target.selected;
         document.getElementById('result3').textContent =
-          e.detail ? `Selected: ${e.detail.name}` : '';
+          item ? `Selected: ${item.name}` : '';
       });
 
       // Demo 4
       const demo4 = document.getElementById('demo4');
       demo4.items = users;
       demo4.placeholder = 'Displaying email...';
-      demo4.addEventListener('bie-change', (e) => {
+      demo4.addEventListener('change', (e) => {
+        const item = e.target.selected;
         document.getElementById('result4').textContent =
-          e.detail ? `Selected: ${e.detail.email}` : '';
+          item ? `Selected: ${item.email}` : '';
       });
 
       // Demo 5: Async loader — simulates API call
@@ -194,9 +198,10 @@
             u.email.toLowerCase().includes(q)
         );
       };
-      demo5.addEventListener('bie-change', (e) => {
+      demo5.addEventListener('change', (e) => {
+        const item = e.target.selected;
         document.getElementById('result5').textContent =
-          e.detail ? `Selected: ${e.detail.name}` : '';
+          item ? `Selected: ${item.name}` : '';
       });
 
       // Demo 6: JSONPlaceholder real API
@@ -222,17 +227,19 @@
         );
       };
 
-      demo6.addEventListener('bie-change', (e) => {
+      demo6.addEventListener('change', (e) => {
+        const item = e.target.selected;
         document.getElementById('result6').textContent =
-          e.detail ? `Selected: ${e.detail.name} (@${e.detail.username})` : '';
+          item ? `Selected: ${item.name} (@${item.username})` : '';
       });
 
       // Demo 7: Cascading dropdown
       const demo7Parent = document.getElementById('demo7-parent');
       demo7Parent.items = countries;
-      demo7Parent.addEventListener('bie-change', (e) => {
+      demo7Parent.addEventListener('change', (e) => {
+        const item = e.target.selected;
         document.getElementById('result7-parent').textContent =
-          e.detail ? `Selected country: ${e.detail.name}` : '';
+          item ? `Selected country: ${item.name}` : '';
       });
 
       const demo7Child = document.getElementById('demo7-child');
@@ -245,9 +252,10 @@
         const q = query.toLowerCase();
         return list.filter((c) => c.name.toLowerCase().includes(q));
       };
-      demo7Child.addEventListener('bie-change', (e) => {
+      demo7Child.addEventListener('change', (e) => {
+        const item = e.target.selected;
         document.getElementById('result7-child').textContent =
-          e.detail ? `Selected city: ${e.detail.name}` : '';
+          item ? `Selected city: ${item.name}` : '';
       });
     </script>
   </body>

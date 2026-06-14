@@ -33,7 +33,7 @@
       <bie-dropdown
         x-ref="dd"
         x-effect="$refs.dd.items = users"
-        @bie-change="selected = $event.detail"
+        @change="selected = $event.target.selected"
         placeholder="Choose user..."
       ></bie-dropdown>
       <div class="result" x-show="selected">
@@ -49,7 +49,7 @@
       <bie-dropdown
         x-ref="dd"
         x-init="$refs.dd.items = loadUsers"
-        @bie-change="selected = $event.detail"
+        @change="selected = $event.target.selected"
         placeholder="Fetching from API..."
         search-debounce="300"
       ></bie-dropdown>
@@ -68,7 +68,7 @@
         id="alpine-country"
         x-ref="country"
         x-effect="$refs.country.items = countries"
-        @bie-change="selectedCountry = $event.detail"
+        @change="selectedCountry = $event.target.selected"
         placeholder="Select country..."
       ></bie-dropdown>
       <div class="result" x-show="selectedCountry">
@@ -84,7 +84,7 @@
         parent-key="id"
         empty-message="Please select a country first"
         search-debounce="200"
-        @bie-change="selectedCity = $event.detail"
+        @change="selectedCity = $event.target.selected"
         placeholder="Select city..."
       ></bie-dropdown>
       <div class="result" x-show="selectedCity">

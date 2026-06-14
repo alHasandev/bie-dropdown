@@ -24,8 +24,11 @@ export type ItemLoader = (
  * @attr {string} depends-on - CSS selector for a parent dropdown this one depends on.
  * @attr {string} parent-key - Key to extract value from parent's selected item.
  * @attr {string} empty-message - Message shown when parent is not selected yet.
+ * @attr {string} value-key - Object key used for the value property (default: "id").
+ * @attr {string} label-template - Template string for display label (e.g. "{name} ({email})").
  *
- * @fires bie-change - Fired when an option is selected. `detail` contains the full item object.
+ * @fires input - Standard input event for live form compatibility (e.g. wire:model.live).
+ * @fires change - Standard change event for form compatibility (e.g. wire:model).
  *
  * @csspart trigger - The trigger button.
  * @csspart arrow - The dropdown arrow indicator.
@@ -446,6 +449,23 @@ export class BieDropdown extends LitElement {
   labelKey = 'name';
 
   /**
+   * Object key used for the value property (read by wire:model).
+   * @default "id"
+   */
+  @property({ type: String, attribute: 'value-key' })
+  valueKey = 'id';
+
+  /**
+   * Template string for display label, using {fieldName} placeholders.
+   * Supports nested fields up to depth 2 (e.g. {address.city}).
+   * Takes precedence over `labelKey` when set.
+   * Example: "{name} ({email})"
+   * @default ""
+   */
+  @property({ type: String, attribute: 'label-template' })
+  labelTemplate = '';
+
+  /**
    * Object keys to search against (comma-separated).
    * Only used when `items` is a static array. Ignored for loader functions.
    * If empty, only `labelKey` is used.
@@ -485,11 +505,53 @@ export class BieDropdown extends LitElement {
   searchDebounce = 300;
 
   /**
-   * The currently selected item (read-only from outside).
-   * Use the `bie-change` event to react to selections.
+   * The currently selected item.
+   * Use the `input` or `change` event + `value` property for form binding.
    */
   @property({ type: Object })
   selected: Record<string, unknown> | null = null;
+
+  /**
+   * String representation of the currently selected value.
+   * Derived from `selected` using `valueKey` (default: "id").
+   * If `valueKey` is empty, the full object is serialized as JSON.
+   *
+   * Compatible with wire:model — set this property from outside
+   * to programmatically select an item, or read it after a change event.
+   */
+  get value(): string | null {
+    if (!this.selected) return null;
+
+    if (this.valueKey) {
+      const val = this.selected[this.valueKey];
+      if (val === undefined) {
+        console.error(
+          `[bie-dropdown] valueKey "${this.valueKey}" not found in selected item`,
+        );
+        return 'undefined';
+      }
+      return String(val);
+    }
+
+    return JSON.stringify(this.selected);
+  }
+
+  set value(val: string | null) {
+    if (val == null || val === '') {
+      this.clear();
+      return;
+    }
+
+    const match = this._findItemByValue(this._getItemsArray(), val);
+    if (match) {
+      this.selected = match;
+      this._pendingValue = null;
+      return;
+    }
+
+    // No match found — queue for later when items become available
+    this._pendingValue = val;
+  }
 
   /**
    * CSS selector for a parent dropdown this one depends on.
@@ -536,8 +598,11 @@ export class BieDropdown extends LitElement {
   @state()
   private _parentValue: unknown | null = null;
 
-  /** Guard to prevent re-entrant clear() calls from bubbling bie-change loops. */
+  /** Guard to prevent re-entrant clear() calls from bubbling event loops. */
   private _clearing = false;
+
+  /** Queued value for async setter when items aren't loaded yet. */
+  private _pendingValue: string | null = null;
 
   // ---- Unique IDs ----
 
@@ -600,6 +665,18 @@ export class BieDropdown extends LitElement {
 
     if (changed.has('items')) {
       this._cachedItems = null;
+
+      // Apply pending value if items are now available
+      if (this._pendingValue) {
+        const match = this._findItemByValue(
+          this._getItemsArray(),
+          this._pendingValue,
+        );
+        if (match) {
+          this.selected = match;
+          this._pendingValue = null;
+        }
+      }
     }
 
     if (changed.has('dependsOn')) {
@@ -745,13 +822,9 @@ export class BieDropdown extends LitElement {
     if (this._clearing) return;
     this._clearing = true;
     this.selected = null;
-    this.dispatchEvent(
-      new CustomEvent('bie-change', {
-        detail: null,
-        bubbles: true,
-        composed: true,
-      }),
-    );
+    this._pendingValue = null;
+    this.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    this.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
     this._clearing = false;
   }
 
@@ -806,13 +879,8 @@ export class BieDropdown extends LitElement {
     this.selected = item;
     this._popoverEl?.hidePopover();
 
-    this.dispatchEvent(
-      new CustomEvent('bie-change', {
-        detail: item,
-        bubbles: true,
-        composed: true,
-      }),
-    );
+    this.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    this.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
 
     this.requestUpdate('selected', old);
   }
@@ -874,6 +942,15 @@ export class BieDropdown extends LitElement {
       if (this._parentValue !== currentParentValue) return;
 
       this._filteredItems = items;
+
+      // Apply pending value if one was queued while loading
+      if (this._pendingValue) {
+        const match = this._findItemByValue(items, this._pendingValue);
+        if (match) {
+          this.selected = match;
+          this._pendingValue = null;
+        }
+      }
 
       // Cache full results for reuse when reopen with same parent value
       if (query === '' && !this._abortController.signal.aborted) {
@@ -948,7 +1025,7 @@ export class BieDropdown extends LitElement {
 
     this._parentEl = parent;
     this._parentChangeHandler = this._onParentChange.bind(this);
-    parent.addEventListener('bie-change', this._parentChangeHandler);
+    parent.addEventListener('change', this._parentChangeHandler);
     this._parentListenerAttached = true;
 
     // Sync initial parent value if parent already has a selection
@@ -960,22 +1037,26 @@ export class BieDropdown extends LitElement {
 
   private _detachParentListener() {
     if (this._parentEl && this._parentChangeHandler) {
-      this._parentEl.removeEventListener('bie-change', this._parentChangeHandler);
+      this._parentEl.removeEventListener('change', this._parentChangeHandler);
     }
     this._parentEl = null;
     this._parentChangeHandler = null;
     this._parentListenerAttached = false;
   }
 
-  private _onParentChange(e: Event) {
-    const detail = (e as CustomEvent).detail as Record<string, unknown> | null;
-    if (detail === null) {
+  private _onParentChange() {
+    if (!this._parentEl) return;
+    const parentDropdown = this._parentEl as BieDropdown;
+    const parentSelected = parentDropdown.selected;
+
+    if (parentSelected === null) {
       this._parentValue = null;
     } else {
-      this._parentValue = this._extractParentValue(detail);
+      this._parentValue = this._extractParentValue(parentSelected);
     }
-    this._cachedItems = null; // invalidate cache on parent change
-    this.selected = null; // reset silently — don't dispatch bie-change (parent already did)
+    this._cachedItems = null;
+    this._pendingValue = null;
+    this.selected = null; // reset silently — parent already dispatched events
     this.reload();
   }
 
@@ -1022,8 +1103,44 @@ export class BieDropdown extends LitElement {
 
   // ---- Private: helpers ----
 
+  private _findItemByValue(
+    items: Record<string, unknown>[],
+    val: string,
+  ): Record<string, unknown> | undefined {
+    if (this.valueKey) {
+      return items.find(
+        (item) => String(item[this.valueKey]) === val,
+      );
+    }
+
+    try {
+      const parsed = JSON.parse(val);
+      return items.find(
+        (item) => JSON.stringify(item) === JSON.stringify(parsed),
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
   private _getLabel(item: Record<string, unknown> | null): string {
     if (!item) return '';
+
+    if (this.labelTemplate) {
+      return this.labelTemplate.replace(/\{([\w.]+)\}/g, (match, path) => {
+        const keys = path.split('.');
+        if (keys.length > 2) return '';
+
+        let val = item[keys[0]];
+        if (keys.length === 2 && val && typeof val === 'object') {
+          val = (val as Record<string, unknown>)[keys[1]];
+        }
+
+        return typeof val === 'string' ? val : String(val ?? '');
+      });
+    }
+
+    // Fallback to labelKey
     const val = item[this.labelKey];
     return typeof val === 'string' ? val : String(val ?? '');
   }
