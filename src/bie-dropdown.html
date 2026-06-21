@@ -1,0 +1,305 @@
+<style>
+  .summary {
+    display: inline-flex;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background: #fff;
+    padding: 1px;
+  }
+  .trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+    border: none;
+    border-radius: 0.5rem;
+    color: #111827;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+  }
+  .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .label[data-placeholder] { color: #9ca3af; }
+  .arrow { font-size: 0.625rem; flex-shrink: 0; }
+  .trigger[aria-expanded="true"] .arrow { transform: rotate(180deg); }
+
+  .reset {
+    display: none;
+    padding: 0.5rem;
+    border: none;
+    border-radius: 0.45rem;
+    color: #111827;
+    cursor: pointer;
+    background: transparent;
+    font: inherit;
+    font-size: 0.625rem;
+  }
+  .summary[data-selected] .reset { display: inline-block; }
+  .summary[data-selected] .trigger { padding-right: 0; }
+
+  .popover {
+    margin: 0;
+    margin-top: 0.25rem;
+    padding: 0;
+    position: absolute;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,.1);
+    overflow: hidden;
+  }
+  .popover-inner { display: flex; flex-direction: column; }
+
+  .header {
+    display: none;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #d1d5db;
+  }
+  .header-title { font-weight: 600; }
+  .close {
+    border: none;
+    background: transparent;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    line-height: 1;
+    border-radius: 0.25rem;
+  }
+
+  .search {
+    padding: 0.5rem 0.75rem;
+  }
+  .search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font: inherit;
+    font-size: 0.875rem;
+    color: #111827;
+    background: #fff;
+    box-sizing: border-box;
+    outline: none;
+  }
+
+  .options {
+    max-height: 18.75rem;
+    overflow: auto;
+  }
+  .option {
+    width: 100%;
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: flex-start;
+    text-align: left;
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+    padding: 0.5rem 1.5rem;
+    color: #111827;
+    position: relative;
+  }
+  .option:hover { background: #f3f4f6; }
+  .option[data-active] { background: #f3f4f6; }
+  .option[aria-selected="true"] { font-weight: 600; }
+
+  .option-check {
+    color: #9ca3af;
+    position: absolute;
+    top: 0.5rem;
+    left: 0.75rem;
+  }
+
+  .option-item-name,
+  .option-item-email { margin: 0; }
+  .option-item-email { font-size: 0.75rem; color: #6b7280; }
+
+  .empty,
+  .loading,
+  .error {
+    padding: 1.5rem 0.75rem;
+    text-align: center;
+    font-size: 0.8125rem;
+  }
+  .empty { color: #9ca3af; }
+  .error { color: #ef4444; }
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: #9ca3af;
+  }
+  .loading::before {
+    content: '';
+    width: 1rem; height: 1rem;
+    border: 2px solid #d1d5db;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: bie-spin 0.6s linear infinite;
+  }
+  @keyframes bie-spin { to { transform: rotate(360deg); } }
+</style>
+
+<!-- ============================================================ -->
+<!-- 1. Summary (trigger + reset)                                    -->
+<!--    data-selected present when an item is chosen                 -->
+<!--    data-placeholder present when nothing selected               -->
+<!-- ============================================================ -->
+
+<!-- selected -->
+<div class="summary" data-selected="">
+  <button class="trigger" type="button" popovertarget="popover-demo" popovertargetaction="toggle" aria-expanded="false">
+    <span class="label">Selected User</span>
+    <span class="arrow" aria-hidden="true">&#9660;</span>
+  </button>
+  <button class="reset" type="button" aria-label="Clear selection">&#10005;</button>
+</div>
+
+<!-- placeholder (nothing selected) -->
+<div class="summary">
+  <button class="trigger" type="button" popovertarget="popover-demo" popovertargetaction="toggle" aria-expanded="false">
+    <span class="label" data-placeholder="">Select...</span>
+    <span class="arrow" aria-hidden="true">&#9660;</span>
+  </button>
+  <button class="reset" type="button" aria-label="Clear selection">&#10005;</button>
+</div>
+
+<!-- ============================================================ -->
+<!-- 2. Popover (opened)                                             -->
+<!--    popover="auto" — native Popover API                          -->
+<!--    Header visible on mobile / CSS anchor fallback               -->
+<!-- ============================================================ -->
+
+<div class="popover" id="popover-demo" popover="auto">
+  <div class="popover-inner">
+
+    <!-- Header (mobile) -->
+    <div class="header">
+      <span class="header-title">Select...</span>
+      <button class="close" type="button" popovertarget="popover-demo" popovertargetaction="hide" aria-label="Close">&#10005;</button>
+    </div>
+
+    <!-- Search -->
+    <div class="search">
+      <input class="search-input" type="search" value="" placeholder="Search..." />
+    </div>
+
+    <!-- Options -->
+    <div class="options" role="listbox">
+
+      <!-- default option -->
+      <button class="option" type="button" role="option" aria-selected="false">
+        <span part="option-item">John Doe</span>
+      </button>
+
+      <!-- selected + highlighted -->
+      <button class="option" type="button" role="option" aria-selected="true" data-active="">
+        <span part="option-check">&#10004;</span>
+        <span part="option-item">Jane Smith</span>
+      </button>
+
+      <!-- custom template -->
+      <button class="option" type="button" role="option" aria-selected="false">
+        <div part="option-item">
+          <p part="option-item-name">Michael Scott</p>
+          <p part="option-item-email">michael@dundermifflin.com</p>
+        </div>
+      </button>
+
+      <!-- custom template + selected + checkmark slot -->
+      <button class="option option-selected" type="button" role="option" aria-selected="true">
+        <span class="option-check" slot="option-check">&#9889;</span>
+        <div part="option-item">
+          <p part="option-item-name">Dwight Schrute</p>
+          <p part="option-item-email">dwight@dundermifflin.com</p>
+        </div>
+      </button>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 3. Loading state (replaces options while fetching)            -->
+<!-- ============================================================ -->
+
+<div class="options" role="listbox">
+  <div class="loading">Loading...</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 4. Empty state (no results / parent unselected)                -->
+<!-- ============================================================ -->
+
+<div class="options" role="listbox">
+  <div class="empty">No results found</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 5. Error state (async loader threw)                            -->
+<!-- ============================================================ -->
+
+<div class="options" role="listbox">
+  <div class="error">Network error</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 6. Full structure at a glance                                  -->
+<!-- ============================================================ -->
+
+<div class="summary" data-selected="">
+  <button class="trigger" type="button" popovertarget="popover-full" popovertargetaction="toggle" aria-expanded="true">
+    <span class="label">Pilih opsi</span>
+    <span class="arrow" aria-hidden="true">&#9660;</span>
+  </button>
+  <button class="reset" type="button" aria-label="Clear selection">&#10005;</button>
+</div>
+
+<div class="popover" id="popover-full" popover="auto">
+  <div class="popover-inner">
+
+    <div class="header">
+      <span class="header-title">Pilih Opsi</span>
+      <button class="close" type="button" popovertarget="popover-full" popovertargetaction="hide" aria-label="Close">&#10005;</button>
+    </div>
+
+    <div class="search">
+      <input class="search-input" type="search" value="" placeholder="Search..." />
+    </div>
+
+    <div class="options" role="listbox">
+
+      <button class="option" type="button" role="option" aria-selected="false">
+        <span part="option-item">John Doe</span>
+      </button>
+
+      <button class="option" type="button" role="option" aria-selected="false">
+        <span part="option-item">Jane Smith</span>
+      </button>
+
+      <button class="option" type="button" role="option" aria-selected="false" data-active="">
+        <div part="option-item">
+          <p part="option-item-name">Michael Scott</p>
+          <p part="option-item-email">michael@dundermifflin.com</p>
+        </div>
+      </button>
+
+      <button class="option option-selected" type="button" role="option" aria-selected="true">
+        <span class="option-check" slot="option-check">&#9889;</span>
+        <div part="option-item">
+          <p part="option-item-name">Dwight Schrute</p>
+          <p part="option-item-email">dwight@dundermifflin.com</p>
+        </div>
+      </button>
+
+    </div>
+  </div>
+</div>
