@@ -1,6 +1,6 @@
 {
   "name": "bie-dropdown",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Searchable dropdown web component built with Lit",
   "type": "module",
   "main": "./dist/bie-dropdown.js",
