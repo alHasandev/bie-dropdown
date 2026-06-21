@@ -391,8 +391,8 @@ Requires **Popover API** and **CSS Anchor Positioning**:
 {{-- resources/views/livewire/user-selector.blade.php --}}
 <div>
     <bie-dropdown
+        id="user-dd"
         wire:model="userId"
-        :items="$users"
         value-key="id"
         label-template="{name} ({email})"
         placeholder="Select a user..."
@@ -400,6 +400,12 @@ Requires **Popover API** and **CSS Anchor Positioning**:
 
     <p>Selected ID: {{ $userId }}</p>
 </div>
+
+@script
+<script>
+    document.getElementById('user-dd').items = @json($users);
+</script>
+@endscript
 ```
 
 ```php
@@ -476,7 +482,6 @@ public function searchUsers($query)
     <bie-dropdown
         id="lw-country"
         wire:model="countryId"
-        :items="$countries"
         value-key="id"
         placeholder="Select country..."
     ></bie-dropdown>
@@ -494,6 +499,8 @@ public function searchUsers($query)
 
 @script
 <script>
+    document.getElementById('lw-country').items = @json($countries);
+
     document.querySelector('[depends-on="#lw-country"]').items = async (query, countryId) => {
         return await $wire.searchCities(query, countryId);
     };
