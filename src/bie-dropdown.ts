@@ -55,6 +55,7 @@ export type ItemLoader = (
  * @cssprop {Color} [--bie-hover-bg=#f3f4f6] - Hover / active background.
  * @cssprop {Color} [--bie-focus-ring=#3b82f6] - Focus ring color.
  * @cssprop {Length} [--bie-radius=0.5rem] - Border radius.
+ * @cssprop {Length} [--bie-max-width=none] - Maximum width of the dropdown.
  */
 @customElement('bie-dropdown')
 export class BieDropdown extends LitElement {
@@ -66,6 +67,8 @@ export class BieDropdown extends LitElement {
       --_hover-bg: var(--bie-hover-bg, #f3f4f6);
       --_focus-ring: var(--bie-focus-ring, #3b82f6);
       --_radius: var(--bie-radius, 0.5rem);
+
+      max-width: var(--bie-max-width, none);
 
       display: inline-block;
       font-family: system-ui, sans-serif;

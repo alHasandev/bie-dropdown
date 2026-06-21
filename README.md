@@ -234,12 +234,21 @@ bie-dropdown {
   --bie-hover-bg: #f3f4f6;
   --bie-focus-ring: #3b82f6;
   --bie-radius: 0.5rem;
+  --bie-max-width: 24rem;
 }
 ```
 
 ### Sizing
 
-Popover automatically matches the trigger width via CSS Anchor Positioning. Control the width with `min-width` / `max-width` on the host element:
+Popover automatically matches the trigger width via CSS Anchor Positioning. Use `--bie-max-width` to constrain the dropdown:
+
+```css
+bie-dropdown {
+  --bie-max-width: 24rem;
+}
+```
+
+Or set `min-width` / `max-width` directly on the host element:
 
 ```css
 bie-dropdown {
