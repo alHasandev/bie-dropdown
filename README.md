@@ -237,6 +237,27 @@ bie-dropdown {
 }
 ```
 
+### Sizing
+
+Popover automatically matches the trigger width via CSS Anchor Positioning. Control the width with `min-width` / `max-width` on the host element:
+
+```css
+bie-dropdown {
+  min-width: 12rem;
+  max-width: 24rem;
+}
+```
+
+Override the popover width independently via the `popover` part:
+
+```css
+/* Popover wider than trigger (e.g. for long option text) */
+bie-dropdown::part(popover) {
+  width: 24rem;
+  max-width: 90vw;
+}
+```
+
 ### CSS Parts
 
 ```css

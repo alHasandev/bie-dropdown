@@ -113,7 +113,8 @@ export class BieDropdown extends LitElement {
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
-      width: 100%;
+      flex: 1;
+      min-width: 0;
       padding: 0.5rem 0.75rem;
       background: var(--_bg);
       border: none;
