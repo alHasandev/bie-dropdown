@@ -201,7 +201,7 @@ city.items = async (query, countryId) => {
   <bie-dropdown
     id="country"
     placeholder="Select Country..."
-    :items="[{id:1,name:'USA'},{id:2,name:'UK'}]"
+    x-init="$el.items = [{id:1,name:'USA'},{id:2,name:'UK'}]"
     @change="selectedCountry = $event.target.selected"
   ></bie-dropdown>
 
